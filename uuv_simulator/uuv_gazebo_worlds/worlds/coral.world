@@ -74,6 +74,12 @@
       <pose>0 0 0 0 0 0</pose>
     </include>
 
+    <!-- Heightmap -->
+    <include>
+      <uri>model://sand_heightmap</uri>
+      <pose>0 0 -95 0 0 0</pose>
+    </include>
+
     <!-- Huge stone -->
     <!-- <include>
       <uri>model://stones</uri>
