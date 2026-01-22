@@ -84,7 +84,8 @@ class ObstacleAvoidanceNode:
         self.last_h = self.current_h
         
         if self.vehicle_pose is None:
-            rospy.loginfo("Vehicle pose not yet received")
+            rospy.logwarn_throttle(5.0, "Vehicle pose not yet received, skipping point cloud")
+            return
             
 
         # Convert point cloud to numpy array
@@ -140,24 +141,19 @@ class ObstacleAvoidanceNode:
     
     
     def pose_callback(self, msg):
-        
+        # Always cache the latest pose so point cloud processing can safely read it.
+        self.vehicle_pose = msg.pose.pose.position
+        orientation_q = msg.pose.pose.orientation
+        quaternion = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
+        self.quaternion = quaternion
+
+        # Convert quaternion to Euler angles (roll, pitch, yaw)
+        euler = tf.transformations.euler_from_quaternion(quaternion)
+        self.yaw = euler[2]  # Only yaw is needed for 2D velocity transformations
+
         if self.xy_cbf or self.xz_cbf or self.sonar_moving:
             # rospy.loginfo(f"current u : {self.current_u}")
             # Store vehicle pose (assuming position in global frame)
-        
-            self.vehicle_pose = msg.pose.pose.position
-            # self.current_u = msg.twist.twist.linear.x
-            # self.current_v = msg.twist.twist.linear.y
-            # self.current_w = msg.twist.twist.linear.z
-            # self.current_r = msg.twist.twist.angular.z
-            orientation_q = msg.pose.pose.orientation
-            quaternion = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
-            
-            self.quaternion= quaternion
-
-            # Convert quaternion to Euler angles (roll, pitch, yaw)
-            euler = tf.transformations.euler_from_quaternion(quaternion)
-            self.yaw = euler[2]  # Only yaw is needed for 2D velocity transformations
 
 
 
