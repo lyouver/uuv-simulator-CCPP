@@ -55,13 +55,12 @@ class SonarHeadingNode:
         self.target_z = None
         self.sonar_centered=True
         self.a_poly=None
-#(43, 63,-52),(39, 50,-55),
+# Four coverage corners within the +-100 map area (start at initial pose)
         self.waypoints = [
-            (29,97,-50),
-           (31,110,-55),
-           (30, 90,-90),
-           (30,120,-40),
-           # Add more waypoints as needed
+           (100, 100, -20),
+           (100, -100, -20),
+           (-100, -100, -20),
+           (-100, 100, -20),
        ]
         self.current_goal_index = 0
         self.current_goal = self.waypoints[self.current_goal_index]
@@ -913,6 +912,8 @@ class SonarHeadingNode:
 
             if mid_beam:
                 # Find the beam closest to the global angle
+                if not hasattr(self, "angle_z_goal"):
+                    self.angle_z_goal = 0
                 self.closest_to_target_vertical = min(mid_beam, key=lambda x: abs(x - self.angle_z_goal))
                 self.new_midb_available=True
                 self.z_motion_ongoing=True
@@ -932,7 +933,7 @@ class SonarHeadingNode:
                     self.xy_called=False
                     
                     print(f"stop_data_collection xy not called")
-                    self.process_data
+                    self.process_data()
         else:
             # rospy.loginfo("resetting start time")
             # rospy.loginfo("resetting start time")
