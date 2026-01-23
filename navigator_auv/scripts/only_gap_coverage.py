@@ -83,6 +83,7 @@ class SonarHeadingNode:
         self.z_motion_ongoing=False
         self.pose_before_z_motion=None
         self.closest_to_target_vertical=None
+        self.z_motion_min_angle_deg=1.0  # avoid zero-angle z motion
         self.rospy_first_time=True  # to reset sonar to position 0
         self.ttd=True  ##when true moves the sonar from top to bottom
         self.fms= True # is the first moving sonar scan, before this it should be xy motion
@@ -798,8 +799,8 @@ class SonarHeadingNode:
                 
 
             
-            self.pose_before_z_motion=self.pose  ##starting pose of vehicle before executing the z angle motion
-            self.navigate_3d(False)           
+            if not self.z_motion_ongoing:
+                self.navigate_3d(False)           
             #self.stop_data_collection()
             #self.start_3d_time = rospy.get_time()  # Reset start time for the next cycle
                 
@@ -914,7 +915,39 @@ class SonarHeadingNode:
                 # Find the beam closest to the global angle
                 if not hasattr(self, "angle_z_goal"):
                     self.angle_z_goal = 0
+
+                if len(mid_beam) > 1 and 0 in mid_beam:
+                    mid_beam = [b for b in mid_beam if b != 0]
+
+                if not mid_beam:
+                    self.z_motion_ongoing=False
+                    self.stop_data_collection()
+                    if xy_called:
+                        self.xy_called=True
+                        print(f" going back to process data")
+                    else:
+                        self.xy_called=False
+                        print(f"stop_data_collection xy not called")
+                        self.process_data()
+                    return
+
                 self.closest_to_target_vertical = min(mid_beam, key=lambda x: abs(x - self.angle_z_goal))
+
+                if abs(self.closest_to_target_vertical) < self.z_motion_min_angle_deg:
+                    self.z_motion_ongoing=False
+                    self.stop_data_collection()
+                    if xy_called:
+                        self.xy_called=True
+                        print(f" going back to process data")
+                    else:
+                        self.xy_called=False
+                        print(f"stop_data_collection xy not called")
+                        self.process_data()
+                    return
+
+                if not self.z_motion_ongoing and self.pose is not None:
+                    self.pose_before_z_motion=self.pose  ##starting pose of vehicle before executing the z angle motion
+
                 self.new_midb_available=True
                 self.z_motion_ongoing=True
                 self.start_data_collection()
@@ -950,29 +983,32 @@ class SonarHeadingNode:
     def move_in_z(self):
         # check distance moved
 
-        
-        if self.closest_to_target_vertical:
-            twist = Twist()
-            if self.closest_to_target_vertical==0:
-                self.closest_to_target_vertical= 1
-            if math.sin(self.closest_to_target_vertical) == 0:
-                raise ValueError("Angle cannot be 0 degrees or 180 degrees as it leads to division by zero.")
-            
-            
-            linear_x=0.5
-            linear_z = linear_x * math.tan(self.closest_to_target_vertical* (math.pi / 180))
-            print(f"losest_to_target_vertical{self.closest_to_target_vertical}")
-            twist = Twist()
-            
-            # Set the linear velocities
-            twist.linear.x = linear_x
-            twist.linear.z = linear_z
-            self.cmd_vel_pub.publish(twist)
+        if self.closest_to_target_vertical is None:
+            return
 
-            #if self.compute_distance(self.pose_before_z_motion,self.pose) > self.min_range:   #distance travelled after giving z motion
-            # if self.compute_distance(self.pose_before_z_motion,self.pose) > 7: 
-            #     self.go_vertical_angle=[]
-            #     self.z_motion_ongoing=False
+        if self.pose_before_z_motion is not None and self.pose is not None and self.min_range:
+            if self.compute_distance(self.pose_before_z_motion,self.pose) > self.min_range:   #distance travelled after giving z motion
+                self.go_vertical_angle=[]
+                self.z_motion_ongoing=False
+                self.stop_data_collection()
+                return
+
+        twist = Twist()
+        if self.closest_to_target_vertical==0:
+            self.closest_to_target_vertical= self.z_motion_min_angle_deg
+        if math.sin(self.closest_to_target_vertical) == 0:
+            raise ValueError("Angle cannot be 0 degrees or 180 degrees as it leads to division by zero.")
+        
+        
+        linear_x=0.5
+        linear_z = linear_x * math.tan(self.closest_to_target_vertical* (math.pi / 180))
+        print(f"losest_to_target_vertical{self.closest_to_target_vertical}")
+        twist = Twist()
+        
+        # Set the linear velocities
+        twist.linear.x = linear_x
+        twist.linear.z = linear_z
+        self.cmd_vel_pub.publish(twist)
 
 
     def compute_distance(self,pose1, pose2):
