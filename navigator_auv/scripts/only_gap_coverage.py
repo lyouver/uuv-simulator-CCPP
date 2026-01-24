@@ -80,6 +80,8 @@ class SonarHeadingNode:
         self.min_ranges=[]
         self.xy_called=False  #to check is process_data called navigate 3d or not, true is process data caled it
         self.min_range=0
+        self.min_range_offset = 2.0
+        self.min_range_floor = 0.5
         self.z_motion_ongoing=False
         self.pose_before_z_motion=None
         self.closest_to_target_vertical=None
@@ -795,7 +797,8 @@ class SonarHeadingNode:
             
             self.ttd=not self.ttd
             if self.min_ranges:
-                self.min_range=min(self.min_ranges)-2
+                raw_min = min(self.min_ranges)
+                self.min_range = max(raw_min - self.min_range_offset, self.min_range_floor)
             else:
                 self.min_range=7
             self.min_ranges=[]
@@ -1005,7 +1008,7 @@ class SonarHeadingNode:
         if self.closest_to_target_vertical is None:
             return
 
-        if self.pose_before_z_motion is not None and self.pose is not None and self.min_range:
+        if self.pose_before_z_motion is not None and self.pose is not None and self.min_range and self.min_range > 0:
             if self.compute_distance(self.pose_before_z_motion,self.pose) > self.min_range:   #distance travelled after giving z motion
                 self.go_vertical_angle=[]
                 self.z_motion_ongoing=False
