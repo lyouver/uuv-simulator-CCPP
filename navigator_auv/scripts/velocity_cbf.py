@@ -130,7 +130,7 @@ class ObstacleAvoidanceNode:
 
             # Filter points within the radius
             within_radius_mask = distances <= self.radius
-            self.filtered_points = all_points[within_radius_mask].tolist()
+            self.filtered_points = all_points[within_radius_mask]
 
         else :
             self.filtered_points = np.empty((0, 3))
@@ -158,7 +158,14 @@ class ObstacleAvoidanceNode:
 
 
             vxx, vyy, vzz = self.vehicle_pose.x, self.vehicle_pose.y, self.vehicle_pose.z
-            distance = np.linalg.norm(self.filtered_points - np.array([vxx, vyy, vzz]), axis=1)
+            filtered = np.asarray(self.filtered_points)
+            if filtered.size == 0:
+                self.closest_obstacle_distance = float('inf')
+                self.closest_point = None
+                return
+            if filtered.ndim == 1:
+                filtered = filtered.reshape(-1, 3)
+            distance = np.linalg.norm(filtered - np.array([vxx, vyy, vzz]), axis=1)
             #smallest_distance = np.min(distance) if distance.size > 0 else float('inf')
             
             if distance.size > 0:
@@ -169,7 +176,7 @@ class ObstacleAvoidanceNode:
                 min_indices = np.where(distance == smallest_distance)[0]
                 
                 # Choose the first point (or handle multiple points as needed)
-                self.closest_point = self.filtered_points[min_indices[0]]
+                self.closest_point = filtered[min_indices[0]]
                 
             else:
                 smallest_distance = float('inf')

@@ -55,12 +55,12 @@ class SonarHeadingNode:
         self.target_z = None
         self.sonar_centered=True
         self.a_poly=None
+        self.a_poly_threshold = 0.2
+        self.max_reach_3d = 12.0
 # Four coverage corners within the +-100 map area (start at initial pose)
         self.waypoints = [
-           (100, 100, -20),
-           (100, -100, -20),
-           (-100, -100, -20),
-           (-100, 100, -20),
+           (-70, 0, -20),
+       
        ]
         self.current_goal_index = 0
         self.current_goal = self.waypoints[self.current_goal_index]
@@ -91,6 +91,7 @@ class SonarHeadingNode:
         self.check_verti_go=True   # check for vertical motion for first time, move in vertical only if this flag is false
         self.target_beam=None
         self.orient_3d=False  #will be true until before 3d, then false, will be true is the rover is looking towards goal for 3d
+        self.last_3d_trigger = None
 
 
     def spawn_marker(self):
@@ -168,10 +169,7 @@ class SonarHeadingNode:
             self.global_angle=0
             self.turn_around=False
 
-        if abs(z-self.target_z)>5: ##check if z bounded
-            self.in_z_bound=False
-        else:
-            self.in_z_bound=True
+        self.in_z_bound = True
 
         
         distance_to_goal_xy = math.sqrt((self.target_x - x) ** 2 + (self.target_y - y) ** 2)
@@ -249,6 +247,12 @@ class SonarHeadingNode:
     def print_polynomial_coefficients(self, coeffs):
         print("Polynomial Coefficients:")
         print(f"y = {coeffs[0]:.4f}x^2 + {coeffs[1]:.4f}x + {coeffs[2]:.4f}")
+
+    def log_3d_trigger(self, reason):
+        # Avoid spamming the same message every cycle
+        if reason != self.last_3d_trigger:
+            rospy.loginfo(f"[3D] Trigger: {reason}")
+            self.last_3d_trigger = reason
 
     def compute_polynomial_derivative(self, coeffs):
         a, b, c = coeffs
@@ -377,6 +381,22 @@ class SonarHeadingNode:
                     obstacle_free_beam_numbers.append(i)
 
             
+            points_cartesian = [self.polar_to_cartesian(i, j, beam_count, range_count) for (i, j) in contour_points]
+            if points_cartesian:  # Extract x and y coordinates
+                x_coords, y_coords = zip(*points_cartesian)
+                self.a_poly = None
+                # Find and plot the curve
+                self.find_and_plot_curve(x_coords, y_coords)
+                print(self.a_poly)
+            else:
+                self.a_poly = None
+            if self.a_poly is not None:
+                rospy.loginfo_throttle(
+                    1.0,
+                    f"[a_poly] value={self.a_poly:.4f} threshold={self.a_poly_threshold:.2f} below={self.a_poly < self.a_poly_threshold}",
+                )
+            else:
+                rospy.loginfo_throttle(1.0, "[a_poly] value=None (no contour points)")
 
             
                 
@@ -466,33 +486,18 @@ class SonarHeadingNode:
                 else:
                     print(f"contour_1")               
 
-                    points_cartesian = [self.polar_to_cartesian(i, j, beam_count, range_count) for (i, j) in contour_points] 
-
-                    if points_cartesian:# Extract x and y coordinates
-                        x_coords, y_coords = zip(*points_cartesian)
-                        
-                        self.a_poly=None
-                        # Find and plot the curve
-                        self.find_and_plot_curve(x_coords, y_coords)
-                        
-                        print(self.a_poly)
-                    
-                    if self.a_poly < 0.02:
-                        
-                        if not self.xy_called :
-
-                            
-                            
+                    if self.a_poly is not None and self.a_poly < self.a_poly_threshold:
+                        if not self.xy_called:
                             print(f"3d") 
                             print(self.a_poly)
                             self.check_verti_go=True
+                            self.log_3d_trigger(
+                                f"no gap & a_poly < {self.a_poly_threshold:.2f} (a_poly={self.a_poly:.4f})"
+                            )
                             self.navigate_3d(True)
-
                         else:
                             self.publish_heading(self.avg_left_slope,2) ####this might not be be latest since i am rotating rover at 3d 
-                        
                     else:
-
                         print(f"3d not required") 
                         if self.left_goal:
                             #check contour slope
@@ -728,6 +733,7 @@ class SonarHeadingNode:
         if not self.in_z_bound:
             # print(f"navigate in 3d")
             self.check_verti_go=True
+            self.log_3d_trigger("in_z_bound=false")
             self.navigate_3d(False)
             
         if self.in_z_bound:
@@ -821,6 +827,7 @@ class SonarHeadingNode:
         data=self.data
         
         break_outer_loop=False
+        dist_hit=None
 
         for j in range(5, 350, 5):
             if break_outer_loop:
@@ -836,7 +843,8 @@ class SonarHeadingNode:
                 # Check against the threshold
                 if data[j,i] > threshold:
                     print(f"exced threshold")
-                    self.min_ranges.append(j*(12/len(self.ranges)))
+                    dist_hit = j * (self.max_reach_3d / len(self.ranges))
+                    self.min_ranges.append(dist_hit)
                     break_outer_loop = True
 
                 
@@ -849,6 +857,17 @@ class SonarHeadingNode:
         if not break_outer_loop:
             #print(f"gap at {int(sonar_angle)}")
             self.go_vertical_angle.append(int(sonar_angle))  
+            if sonar_angle > 0:
+                rospy.loginfo_throttle(
+                    1.0,
+                    f"[3D] angle={sonar_angle} deg, dist>{self.max_reach_3d:.2f} (max_reach={self.max_reach_3d:.2f}) => no hit",
+                )
+        elif sonar_angle > 0:
+            relation = ">" if dist_hit > self.max_reach_3d else "<="
+            rospy.loginfo_throttle(
+                1.0,
+                f"[3D] angle={sonar_angle} deg, hit dist={dist_hit:.2f} (max_reach={self.max_reach_3d:.2f}) => dist {relation} max_reach",
+            )
 
             
             

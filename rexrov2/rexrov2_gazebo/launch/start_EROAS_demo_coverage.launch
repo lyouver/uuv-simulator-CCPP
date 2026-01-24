@@ -17,10 +17,10 @@
 
 
     <!-- Vehicles intial position in world B -->
-    <arg name="x" default="100" doc="X coordinate of the vehicle's initial position (in ENU)"/>
-    <arg name="y" default="100" doc="Y coordinate of the vehicle's initial position (in ENU)"/>
-    <arg name="z" default="-20" doc="Z coordinate of the vehicle's initial position (in ENU)"/>
-    <arg name="yaw" default="-1.57" doc="Yaw angle of the vehicle's initial orientation"/>
+    <arg name="x" default="-70" doc="X coordinate of the vehicle's initial position (in ENU)"/>
+    <arg name="y" default="-80" doc="Y coordinate of the vehicle's initial position (in ENU)"/>
+    <arg name="z" default="-22" doc="Z coordinate of the vehicle's initial position (in ENU)"/>
+    <arg name="yaw" default="1.57" doc="Yaw angle of the vehicle's initial orientation"/>
 
     <arg name="teleop_on" default="false" doc="If true, the teleop node will be started"/>
     <arg name="joy_id" default="0" doc="Joystick ID"/>
