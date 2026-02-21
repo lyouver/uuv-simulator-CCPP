@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- One-click: Gazebo + RexROV + global coverage -->
+  <arg name="waypoint_file" default=""/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+
+  <arg name="odom_topic" default="/rexrov/pose_gt_ned"/>
+
+  <!-- 1) Simulation + RexROV + controller + RViz -->
+  <include file="$(find underwater_coverage_planning)/launch/compact_terrain_rexrov_with_trajectory.launch">
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+  </include>
+
+  <!-- 2) Global path publisher + coordinator -->
+  <include file="$(find underwater_coverage_planning)/launch/global_local_coverage.launch">
+    <arg name="waypoint_file" value="$(arg waypoint_file)"/>
+    <arg name="odom_topic" value="$(arg odom_topic)"/>
+  </include>
+</launch>

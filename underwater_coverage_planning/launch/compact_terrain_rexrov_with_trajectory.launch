@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 
+    完整的紧凑水下地形覆盖规划系统 - 对齐官方控制器启动链路：
+    - 环境 + world_ned
+    - 上传模型
+    - 控制器launch负责推进器管理与轨迹可视化
+  -->
+  
+  <!-- 参数设置 -->
+  <arg name="uuv_name" default="rexrov"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="model_name" default="rexrov"/>
+  <arg name="model_mode" default="nps_multibeam"/>
+  <arg name="use_ned_frame" default="true"/>
+  <arg name="max_forward_speed" default="0.6"/>
+  <!-- Control whether the controller's trajectory_marker_publisher is launched -->
+  <arg name="controller_gui" default="true"/>
+  
+  <!-- 启动Gazebo仿真环境 -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find underwater_coverage_planning)/worlds/compact_underwater_terrain.world"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="headless" value="false"/>
+    <arg name="debug" value="false"/>
+    <arg name="verbose" value="false"/>
+  </include>
+
+  <!-- 解暂停，与官方一致 -->
+  <include file="$(find uuv_assistants)/launch/unpause_simulation.launch">
+    <arg name="timeout" value="5"/>
+  </include>
+
+  <!-- 发布世界NED坐标系（用于可视化参考） -->
+  <include file="$(find uuv_assistants)/launch/publish_world_ned_frame.launch"/>
+
+  <!-- 发布世界模型（地形） -->
+  <node name="publish_world_models"
+        pkg="uuv_assistants"
+        type="publish_world_models.py"
+        output="screen">
+    <rosparam subst_value="true">
+      meshes:
+        heightmap_terrain:
+          mesh: package://uuv_gazebo_worlds/models/sand_heightmap/meshes/heightmap.dae
+          model: sand_heightmap
+          pose:
+            position: [0, 0, -25]
+    </rosparam>
+  </node>
+
+  <!-- 启动RexROV机器人（NED） -->
+  <include file="$(find uuv_descriptions)/launch/upload_rexrov_default.launch">
+    <arg name="x" value="-54"/>
+    <arg name="y" value="-58"/>
+    <arg name="z" value="-15"/>
+    <arg name="namespace" value="$(arg uuv_name)"/>
+    <arg name="mode" value="$(arg model_mode)"/>
+    <arg name="use_ned_frame" value="true"/>
+  </include>
+
+  <!-- 控制器侧启动（官方做法）：包含推进器管理与轨迹可视化（gui_on 时） -->
+  <include file="$(find uuv_trajectory_control)/launch/rov_pid_controller.launch">
+    <arg name="uuv_name" value="$(arg uuv_name)"/>
+    <arg name="gui_on" value="$(arg controller_gui)"/>
+    <arg name="use_ned_frame" value="true"/>
+  </include>
+
+  <!-- Don't patch uuv_simulator: override the controller's private param from here -->
+  <param name="/$(arg uuv_name)/rov_pid_controller/max_forward_speed" value="$(arg max_forward_speed)"/>
+
+  <!-- 启动RViz（NED配置） -->
+  <node name="rviz" pkg="rviz" type="rviz" output="screen" 
+        args="-d $(find underwater_coverage_planning)/rviz/rexrov_trajectory.rviz"
+        launch-prefix="bash -c 'sleep 8; $0 $@' "/>
+
+</launch> 

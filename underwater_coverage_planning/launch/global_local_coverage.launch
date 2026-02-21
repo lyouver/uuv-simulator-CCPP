@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="uuv_name" default="rexrov"/>
+  <arg name="waypoint_file" default=""/>
+  <arg name="path_topic" default="/nav/global_path"/>
+  <arg name="odom_topic" default="/$(arg uuv_name)/pose_gt_ned"/>
+  <arg name="start_waypoint_service" default="/$(arg uuv_name)/start_waypoint_list"/>
+  <arg name="output_frame" default="world_ned"/>
+  <arg name="command_period" default="20.0"/>
+  <arg name="index_advance_trigger" default="6"/>
+  <arg name="min_waypoint_separation" default="0.5"/>
+  <arg name="min_start_distance" default="0.3"/>
+  <arg name="closest_index_window" default="12"/>
+
+  <node pkg="underwater_coverage_planning" name="global_path_publisher" type="path_publisher.py" output="screen">
+    <param name="waypoint_file" value="$(arg waypoint_file)"/>
+    <param name="path_topic" value="$(arg path_topic)"/>
+    <param name="output_frame" value="$(arg output_frame)"/>
+    <param name="auto_latest" value="true"/>
+    <param name="publish_rate" value="0.2"/>
+  </node>
+
+  <node pkg="underwater_coverage_planning" name="global_coverage_manager" type="global_coverage_manager.py" output="screen">
+    <param name="path_topic" value="$(arg path_topic)"/>
+    <param name="odom_topic" value="$(arg odom_topic)"/>
+    <param name="start_waypoint_service" value="$(arg start_waypoint_service)"/>
+    <param name="max_forward_speed" value="0.6"/>
+    <param name="lookahead_distance" value="70.0"/>
+    <param name="command_period" value="$(arg command_period)"/>
+    <param name="index_advance_trigger" value="$(arg index_advance_trigger)"/>
+    <param name="min_waypoint_separation" value="$(arg min_waypoint_separation)"/>
+    <param name="min_start_distance" value="$(arg min_start_distance)"/>
+    <param name="closest_index_window" value="$(arg closest_index_window)"/>
+  </node>
+</launch>

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="uuv_name" default="rexrov"/>
+	<arg name="waypoint_file" default="$(find underwater_coverage_planning)/scripts/guiji/trajectory_20260206_205345_ros_waypoints.yaml"/>
+	<arg name="max_forward_speed" default="40.0"/>
+	<arg name="use_fixed_heading" default="false"/>
+	<arg name="downsample_step" default="1"/>
+	<arg name="interpolator" default="cubic"/>
+
+	<node name="trajectory_to_waypoints_loader"
+	      pkg="underwater_coverage_planning"
+	      type="trajectory_to_waypoints_loader.py"
+	      output="screen">
+		<param name="uuv_name" value="$(arg uuv_name)"/>
+		<param name="trajectory_file" value=""/>
+		<param name="waypoint_file" value="$(arg waypoint_file)"/>
+		<param name="max_forward_speed" value="$(arg max_forward_speed)"/>
+		<param name="use_fixed_heading" value="$(arg use_fixed_heading)"/>
+		<param name="downsample_step" value="$(arg downsample_step)"/>
+		<param name="interpolator" value="$(arg interpolator)"/>
+	</node>
+</launch>
